@@ -1,7 +1,11 @@
 import axios from 'axios'
+import dotenv from 'dotenv'
+import EventSource from 'eventsource'
 import { v4 as uuidv4 } from 'uuid'
 
 import * as types from './types'
+
+dotenv.config()
 
 export async function sendMessage(
   text: string,
@@ -43,46 +47,49 @@ export async function sendMessage(
   if (conversationId) {
     body.conversation_id = conversationId
   }
-  const result: types.ChatMessage = {
-    role: 'assistant',
-    id: uuidv4(),
-    parentMessageId: messageId,
-    conversationId,
-    text: ''
-  }
-
-  const axiosInstance = axios.create({
-    baseURL: apiReverseProxyUrl
-  })
   const responseP = new Promise<types.ChatMessage>(async (resolve, reject) => {
-    const res = await axiosInstance.post<string>('/', body, { headers })
-    const data = res.data
-
-    if (res.data === '[DONE]') {
-      return resolve(result)
+    const result: types.ChatMessage = {
+      role: 'assistant',
+      id: uuidv4(),
+      parentMessageId: messageId,
+      conversationId,
+      text: ''
     }
     try {
-      console.log(data)
-      const convoResponseEvent: types.ConversationResponseEvent =
-        JSON.parse(data)
-      console.log(convoResponseEvent)
-      if (convoResponseEvent.conversation_id) {
-        result.conversationId = convoResponseEvent.conversation_id
-      }
-      if (convoResponseEvent.message?.id) {
-        result.id = convoResponseEvent.message.id
-      }
-      const message = convoResponseEvent.message
-      if (message) {
-        let text = message?.content?.parts?.[0]
+      const response = await axios.post(apiReverseProxyUrl, body, {
+        headers: headers,
+        responseType: 'stream'
+      })
+      const stream = response.data
 
-        if (text) {
-          result.text = text
-          if (onProgress) {
-            onProgress(result)
-          }
+      stream.on('data', (data) => {
+        data = data.toString()
+        // Process data
+        if (data === '[DONE]') {
+          return resolve(result)
         }
-      }
+        try {
+          const convoResponseEvent: types.ConversationResponseEvent =
+            JSON.parse(data)
+          if (convoResponseEvent.message?.id) {
+            result.id = convoResponseEvent.message.id
+          }
+          const message = convoResponseEvent.message
+          if (message) {
+            let text = message?.content?.parts?.[0]
+
+            if (text) {
+              result.text = text
+              console.log(text)
+
+              if (onProgress) {
+                onProgress(result)
+              }
+            }
+          }
+          console.log(message)
+        } catch (err) {}
+      })
     } catch (err) {
       reject(err)
     }
