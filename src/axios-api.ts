@@ -62,11 +62,13 @@ export async function sendMessage(
       })
       const stream = response.data
 
-      stream.on('data', (data) => {
-        data = data.toString()
+      stream.on('data', async (buf: Buffer) => {
         // Process data
+        const data = buf.toString().substring(6)
+
         if (data === '[DONE]') {
-          return resolve(result)
+          resolve(result)
+          return
         }
         try {
           const convoResponseEvent: types.ConversationResponseEvent =
@@ -80,14 +82,11 @@ export async function sendMessage(
 
             if (text) {
               result.text = text
-              console.log(text)
-
               if (onProgress) {
                 onProgress(result)
               }
             }
           }
-          console.log(message)
         } catch (err) {}
       })
     } catch (err) {
@@ -98,13 +97,11 @@ export async function sendMessage(
 }
 sendMessage('Hello, who are u?', {
   onProgress: (partialResponse) => {
-    console.log(partialResponse.text)
+    console.log('onProgress', partialResponse.text)
   }
 })
   .then((response) => {
-    console.log('Chat start!!')
-    console.log(response)
-    console.log('Nice chating!!')
+    console.log('response', response)
   })
   .catch((err) => {
     console.error(err)
