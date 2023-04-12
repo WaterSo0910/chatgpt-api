@@ -67,9 +67,10 @@ export async function sendMessage(
 
         dataList.forEach((data) => {
           try {
-            if (data.substring(0, 6) === 'data') {
+            if (data.substring(0, 6) !== 'data: ') {
               throw Error('Not complete. Keep appending..')
             }
+            console.log(data.substring(0, 6))
             data = data.substring(6)
             if (data === '[DONE]') {
               resolve(result)
