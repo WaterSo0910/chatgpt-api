@@ -1,6 +1,5 @@
 import axios from 'axios'
 import dotenv from 'dotenv'
-import EventSource from 'eventsource'
 import { v4 as uuidv4 } from 'uuid'
 
 import * as types from './types'
@@ -64,30 +63,32 @@ export async function sendMessage(
 
       stream.on('data', async (buf: Buffer) => {
         // Process data
-        const data = buf.toString().substring(6)
-
-        if (data === '[DONE]') {
-          resolve(result)
-          return
-        }
-        try {
-          const convoResponseEvent: types.ConversationResponseEvent =
-            JSON.parse(data)
-          if (convoResponseEvent.message?.id) {
-            result.id = convoResponseEvent.message.id
+        const dataList = buf.toString().split('\n\n')
+        dataList.forEach((data) => {
+          data = data.substring(6)
+          if (data === '[DONE]') {
+            resolve(result)
+            return
           }
-          const message = convoResponseEvent.message
-          if (message) {
-            let text = message?.content?.parts?.[0]
+          try {
+            const convoResponseEvent: types.ConversationResponseEvent =
+              JSON.parse(data)
+            if (convoResponseEvent.message?.id) {
+              result.id = convoResponseEvent.message.id
+            }
+            const message = convoResponseEvent.message
+            if (message) {
+              let text = message?.content?.parts?.[0]
 
-            if (text) {
-              result.text = text
-              if (onProgress) {
-                onProgress(result)
+              if (text) {
+                result.text = text
+                if (onProgress) {
+                  onProgress(result)
+                }
               }
             }
-          }
-        } catch (err) {}
+          } catch (err) {}
+        })
       })
     } catch (err) {
       reject(err)
